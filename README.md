@@ -1,7 +1,7 @@
 # Decidr AI 🚦
 
 ## Problem
-Mumbai’s traffic is unpredictable, and people struggle to make optimal route decisions due to lack of structured insights.
+Mumbai’s traffic is unpredictable, and people struggle to make optimal route decisions due to a lack of structured insights.
 
 ## Solution
 Decidr AI combines AI-driven predictions with real-time community observations to provide smarter route decisions.
@@ -18,10 +18,10 @@ Decidr AI combines AI-driven predictions with real-time community observations t
 - AI: OpenAI API
 
 ## How it works
-User inputs a route → AI analyzes → combines with community data → suggests best decision.
+User inputs a route → AI analyses → combines with community data → suggests the best decision.
 
 ## Demo
-(Add your deployed link here)
+https://decidr-ai.netlify.app
 
 ## Future Scope
 - Live traffic API integration
