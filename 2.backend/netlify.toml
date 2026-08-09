@@ -2,14 +2,14 @@
   publish = "."
   functions = "netlify/functions"
 
-# API routes
+# API routes (keep this FIRST)
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
   force = true
 
-# Frontend routes (IMPORTANT FIX)
+# 🔥 IMPORTANT: Frontend fallback
 [[redirects]]
   from = "/*"
   to = "/index.html"
