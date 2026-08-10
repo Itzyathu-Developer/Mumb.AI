@@ -9,8 +9,5 @@
   },
   "engines": {
     "node": ">=18"
-  },
-  "devDependencies": {
-    "netlify-cli": "^16.0.0"
   }
 }
