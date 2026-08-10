@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "Decidr AI backend",
   "main": "server.js",
+  "type": "module",   ← ✅ ADD THIS LINE
   "scripts": {
     "start": "node server.js"
   },
