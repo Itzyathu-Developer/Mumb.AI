@@ -1720,6 +1720,8 @@ function AuthModal({ mode, setMode, onClose, onSubmit }){
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verificationPending, setVerificationPending] = useState(false);
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -1734,10 +1736,12 @@ function AuthModal({ mode, setMode, onClose, onSubmit }){
       return;
     }
     setSubmitting(true);
+    const normalizedEmail = email.trim().toLowerCase();
     const passwordHash = await hashPassword(password);
-    const result = await onSubmit({ name: name.trim() || email.split('@')[0], email: email.trim().toLowerCase(), passwordHash });
+    const result = await onSubmit({ name: name.trim() || email.split('@')[0], email: normalizedEmail, passwordHash, verificationCode: verificationPending ? verificationCode : undefined });
     setSubmitting(false);
     if (result?.error) setMessage(result.error);
+    else if (result?.verificationRequired) { setVerificationPending(true); setMessage('We sent a 6-digit code to your email.'); }
   };
 
   return (
@@ -1752,11 +1756,12 @@ function AuthModal({ mode, setMode, onClose, onSubmit }){
         </div>
         {mode === 'signup' && <input value={name} onChange={e => setName(e.target.value)} placeholder="Your name" className="w-full surface rounded-lg px-3 py-2.5 mt-6 text-sm bg-transparent placeholder:text-[var(--ink-2)]" />}
         <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email address" className="w-full surface rounded-lg px-3 py-2.5 mt-3 text-sm bg-transparent placeholder:text-[var(--ink-2)]" />
-        <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password (8+ characters)" className="w-full surface rounded-lg px-3 py-2.5 mt-3 text-sm bg-transparent placeholder:text-[var(--ink-2)]" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} />
+        {!verificationPending && <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password (8+ characters)" className="w-full surface rounded-lg px-3 py-2.5 mt-3 text-sm bg-transparent placeholder:text-[var(--ink-2)]" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} />}
+        {verificationPending && <input inputMode="numeric" pattern="[0-9]{6}" maxLength="6" value={verificationCode} onChange={e => setVerificationCode(e.target.value.replace(/\D/g, ''))} placeholder="6-digit verification code" className="w-full surface rounded-lg px-3 py-2.5 mt-3 text-sm bg-transparent placeholder:text-[var(--ink-2)]" autoComplete="one-time-code" />}
         {message && <p className="text-xs text-amber-300 mt-3">{message}</p>}
-        <button type="submit" disabled={submitting} className="w-full rounded-xl py-2.5 mt-5 text-sm font-medium text-[#04110E] disabled:opacity-50" style={{backgroundImage:'var(--grad)'}}>{submitting ? 'Checking…' : mode === 'signup' ? 'Create account' : 'Sign in'}</button>
+        <button type="submit" disabled={submitting} className="w-full rounded-xl py-2.5 mt-5 text-sm font-medium text-[#04110E] disabled:opacity-50" style={{backgroundImage:'var(--grad)'}}>{submitting ? 'Checking…' : verificationPending ? 'Verify email' : mode === 'signup' ? 'Create account' : 'Sign in'}</button>
         <button type="button" onClick={() => { setMode(mode === 'signup' ? 'signin' : 'signup'); setMessage(''); }} className="w-full text-xs text-[var(--ink-1)] mt-4">{mode === 'signup' ? 'Already have an account? Sign in' : 'New here? Sign up'}</button>
-        <p className="text-[11px] text-[var(--ink-2)] mt-4 text-center">Prototype account: password hash and progress are saved only in this browser.</p>
+        <p className="text-[11px] text-[var(--ink-2)] mt-4 text-center">New accounts require a real email verification code before access is granted.</p>
       </form>
     </div>
   );
@@ -1926,7 +1931,7 @@ function App(){
 
   const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(null), 2600); }, []);
 
-  const handleAuthSubmit = useCallback(async ({ name, email, passwordHash }) => {
+  const handleAuthSubmit = useCallback(async ({ name, email, passwordHash, verificationCode }) => {
     const accounts = readAccountStore();
     const normalizedEmail = normalizeEmail(email);
     if (!normalizedEmail) return { error: 'Enter a valid email address.' };
@@ -1935,6 +1940,16 @@ function App(){
     if (authMode === 'signin' && !saved) return { error: 'No local account found for this email. Sign up first.' };
     if (authMode === 'signin' && !saved?.passwordHash) return { error: 'This older account has no password. Sign up again with a new email.' };
     if (authMode === 'signin' && saved.passwordHash !== passwordHash) return { error: 'Incorrect email or password.' };
+    if (authMode === 'signup' && !verificationCode) {
+      const response = await fetch(`${API_BASE}/api/email-verification`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'send', email: normalizedEmail }) });
+      const result = await response.json().catch(() => ({}));
+      return response.ok ? { verificationRequired: true } : { error: result.error || 'Could not send a verification email.' };
+    }
+    if (authMode === 'signup') {
+      const response = await fetch(`${API_BASE}/api/email-verification`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'verify', email: normalizedEmail, code: verificationCode }) });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) return { error: result.error || 'Could not verify that code.' };
+    }
     const next = authMode === 'signin'
       ? saved
       : { name, email: normalizedEmail, passwordHash, timePoints: 15, observations: [], welcomeBonusGranted: true, trialExpiresAt: Date.now() + 5 * 60 * 60 * 1000, rewardDecision: null, premiumExpiresAt: 0 };
