@@ -1,0 +1,16 @@
+{
+  "name": "mumb-ai",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Mumb.AI Mumbai decision engine with Netlify Functions backend",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "netlify dev"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "netlify-cli": "^16.0.0"
+  }
+}

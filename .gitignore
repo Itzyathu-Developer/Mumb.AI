@@ -1,0 +1,15 @@
+# Local dependencies and build output
+node_modules/
+**/node_modules/
+.netlify/
+**/.netlify/
+
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Local OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
