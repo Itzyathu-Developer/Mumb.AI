@@ -50,9 +50,7 @@ function parseJson(text) {
 
 function normalizeModelResult(payload, rawText) {
   const parsed = payload && typeof payload === 'object' ? payload : parseJson(rawText) || {};
-  if (typeof parsed.answer === 'string' && parsed.answer.trim()) {
-    return { answer: parsed.answer.trim() };
-  }
+  if (Object.keys(parsed).length) return parsed;
   if (typeof rawText === 'string' && rawText.trim()) {
     return { answer: rawText.trim() };
   }

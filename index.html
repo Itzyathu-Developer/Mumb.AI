@@ -741,9 +741,10 @@ function HowItWorksStrip(){
 
 const STAGE_LABELS = ['Understanding your goal', 'Gathering signals', 'Simulating possibilities', 'Optimizing'];
 
-function AnalyzeFlow({ goalText, setGoalText, scenarioKey, setScenarioKey, stage, setStage, constraints, options, onRunAnalysis, isDemo }){
+function AnalyzeFlow({ goalText, setGoalText, scenarioKey, setScenarioKey, stage, setStage, constraints, options, onRunAnalysis, isDemo, aiReady }){
   useEffect(() => {
     if (stage === 0 || stage > 4) return;
+    if (stage >= 3 && !aiReady) return;
     const t = setTimeout(() => setStage(s => Math.min(4, s+1)), isDemo ? 900 : 650);
     return () => clearTimeout(t);
   }, [stage]);
@@ -779,7 +780,7 @@ function AnalyzeFlow({ goalText, setGoalText, scenarioKey, setScenarioKey, stage
           <div className="mt-8">
             {stage === 1 && <StageUnderstanding constraints={constraints} />}
             {stage === 2 && <StageGathering />}
-            {stage === 3 && <StageSimulating options={options} />}
+            {stage === 3 && <StageSimulating options={aiReady ? options : []} />}
             {stage === 4 && <StageOptimizing options={options} constraints={constraints} />}
           </div>
         </div>
@@ -1034,25 +1035,25 @@ function ExplainPanel({ best }){
    WHAT-IF SIMULATOR
    ========================================================================================= */
 
-function WhatIfSimulator({ scenarioKey, baseConstraints, options, whatIf, setWhatIf, recalculating, premiumUnlocked, hasDecision, account, onAuthOpen }){
+function WhatIfSimulator({ scenarioKey, baseConstraints, options, whatIf, setWhatIf, recalculating, premiumUnlocked, hasDecision, aiDecision, account, onAuthOpen }){
   const effective = {
     ...baseConstraints,
     budget: whatIf.budget,
     crowdPref: whatIf.crowdTolerance,
     deadlineMinutes: baseConstraints.deadlineMinutes + whatIf.deadlineOffset,
   };
-  const whatIfOptions = useMemo(() => generateOptions(effective, scenarioKey), [scenarioKey, effective.budget, effective.deadlineMinutes, effective.crowdPref, effective.distanceKm]);
+  const whatIfOptions = useMemo(() => aiDecision?.options || [], [aiDecision]);
   const scored = useMemo(() => scoreOptions(whatIfOptions, effective, 18*60), [whatIfOptions, effective.budget, effective.crowdPref, effective.deadlineMinutes]);
-  const rec = useMemo(() => buildRecommendation(scored, effective, 18*60), [scored]);
+  const rec = useMemo(() => scored.length ? buildRecommendation(scored, effective, 18*60) : null, [scored]);
 
-  if (!hasDecision) {
+  if (!hasDecision || !aiDecision?.options?.length) {
     return (
       <section className="max-w-6xl mx-auto px-5 md:px-8 py-10 md:py-16">
         <SectionHeading eyebrow="What-if mode" title="Start with a real decision first." sub="Enter a goal on the Home page and analyze it. What-If will then compare alternatives using your actual constraints." />
         <div className="glass rounded-2xl p-8 mt-8 text-center">
           <Icon name="info" className="w-6 h-6 mx-auto text-cyan-300" />
           <p className="font-display text-lg mt-3">No decision loaded yet</p>
-          <p className="text-sm text-[var(--ink-1)] mt-2">Nothing is being estimated from a placeholder or anonymous default.</p>
+          <p className="text-sm text-[var(--ink-1)] mt-2">Nothing is being estimated until Mumb.AI returns a complete decision.</p>
           {!account && <><p className="text-sm text-cyan-300 mt-4">Sign in or sign up for a 5-hour free trial of all premium features.</p><button onClick={onAuthOpen} className="rounded-xl px-5 py-2.5 mt-4 text-sm font-medium text-[#04110E]" style={{backgroundImage:'var(--grad)'}}>Sign in / Sign up</button></>}
         </div>
       </section>
@@ -1229,6 +1230,32 @@ async function askMumbAI(question){
     console.error('Mumb.AI request failed:', error);
     return `Mumb.AI could not reach the deployed AI service. ${error.message} Please redeploy the latest version and check the Netlify function logs.`;
   }
+}
+
+async function analyzeDecisionWithAI({ goal, scenario, communitySignals }){
+  const response = await fetch(`${API_BASE}/.netlify/functions/analyze-decision`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ goal, scenario, communitySignals }),
+  });
+  if (!response.ok) throw new Error('AI decision engine unavailable');
+  const result = await response.json();
+  if (!result.constraints || !Array.isArray(result.options) || !result.options.length) {
+    throw new Error('AI decision engine returned incomplete data');
+  }
+  return result;
+}
+
+async function generateCommunityPostsWithAI(scenario){
+  const response = await fetch(`${API_BASE}/.netlify/functions/generate-community-posts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scenario, count: 3 }),
+  });
+  if (!response.ok) throw new Error('AI community generator unavailable');
+  const result = await response.json();
+  if (!Array.isArray(result.posts) || !result.posts.length) throw new Error('AI community generator returned no posts');
+  return result.posts;
 }
 
 function buildLocalAnswer(question){
@@ -1488,17 +1515,17 @@ function TimePointsBar({ timePoints, premiumUnlocked }){
    TIME MACHINE (Premium)
    ========================================================================================= */
 
-function TimeMachine({ scenarioKey, constraints, premiumUnlocked, account, onAuthOpen, hasDecision }){
-  const slots = useMemo(() => timeMachineSlots(constraints, scenarioKey), [scenarioKey, constraints.budget]);
-  const optimal = slots.reduce((a,b) => a.eta < b.eta ? a : b);
-  const worst = slots.reduce((a,b) => a.eta > b.eta ? a : b);
+function TimeMachine({ scenarioKey, constraints, aiDecision, premiumUnlocked, account, onAuthOpen, hasDecision }){
+  const slots = aiDecision?.timeMachineSlots || [];
+  const optimal = slots.length ? slots.reduce((a,b) => a.eta < b.eta ? a : b) : null;
+  const worst = slots.length ? slots.reduce((a,b) => a.eta > b.eta ? a : b) : null;
 
   return (
     <section className="max-w-5xl mx-auto px-5 md:px-8 py-10 md:py-16">
       <SectionHeading eyebrow="Premium · Time Machine" title="See how conditions shift across the day."
         sub="Predicted, not guaranteed — based on historical patterns and time-of-day modeling." />
 
-      {!hasDecision ? <div className="glass rounded-2xl p-8 mt-8 text-center"><Icon name="info" className="w-6 h-6 mx-auto text-cyan-300" /><p className="font-display text-lg mt-3">No decision loaded yet</p><p className="text-sm text-[var(--ink-1)] mt-2">Enter and analyze a goal first. Mumb.AI will not show time estimates from anonymous defaults.</p>{!account && <><p className="text-sm text-cyan-300 mt-4">Sign in or sign up for a 5-hour free trial of all premium features.</p><button onClick={onAuthOpen} className="rounded-xl px-5 py-2.5 mt-4 text-sm font-medium text-[#04110E]" style={{backgroundImage:'var(--grad)'}}>Sign in / Sign up</button></>}</div> : !premiumUnlocked ? <LockedPanel feature="Time Machine" account={account} onAuthOpen={onAuthOpen} /> : (
+      {!hasDecision ? <div className="glass rounded-2xl p-8 mt-8 text-center"><Icon name="info" className="w-6 h-6 mx-auto text-cyan-300" /><p className="font-display text-lg mt-3">No decision loaded yet</p><p className="text-sm text-[var(--ink-1)] mt-2">Enter and analyze a goal first. Mumb.AI will not show time estimates from anonymous defaults.</p>{!account && <><p className="text-sm text-cyan-300 mt-4">Sign in or sign up for a 5-hour free trial of all premium features.</p><button onClick={onAuthOpen} className="rounded-xl px-5 py-2.5 mt-4 text-sm font-medium text-[#04110E]" style={{backgroundImage:'var(--grad)'}}>Sign in / Sign up</button></>}</div> : !premiumUnlocked ? <LockedPanel feature="Time Machine" account={account} onAuthOpen={onAuthOpen} /> : !slots.length ? <div className="glass rounded-2xl p-8 mt-8 text-center"><Icon name="info" className="w-6 h-6 mx-auto text-amber-300" /><p className="font-display text-lg mt-3">AI time forecast unavailable</p><p className="text-sm text-[var(--ink-1)] mt-2">Mumb.AI did not return enough forecast data for this decision.</p></div> : (
         <div className="glass rounded-2xl p-6 mt-8">
           <div className="grid grid-cols-5 gap-2 md:gap-3">
             {slots.map(s => (
@@ -1523,18 +1550,18 @@ function TimeMachine({ scenarioKey, constraints, premiumUnlocked, account, onAut
 
       <div className="mt-10">
         <SectionHeading eyebrow="Premium · Weekly optimizer" title="Time saved across your week" />
-        {!hasDecision ? <div className="glass rounded-2xl p-8 mt-6 text-center"><Icon name="info" className="w-6 h-6 mx-auto text-cyan-300" /><p className="font-display text-lg mt-3">Analyze a decision to build your weekly view</p><p className="text-sm text-[var(--ink-1)] mt-2">Weekly savings will appear only after Mumb.AI has a real goal and constraints.</p>{!account && <><p className="text-sm text-cyan-300 mt-4">Sign in or sign up for a 5-hour free trial of all premium features.</p><button onClick={onAuthOpen} className="rounded-xl px-5 py-2.5 mt-4 text-sm font-medium text-[#04110E]" style={{backgroundImage:'var(--grad)'}}>Sign in / Sign up</button></>}</div> : !premiumUnlocked ? <LockedPanel feature="Weekly Optimizer" account={account} onAuthOpen={onAuthOpen} /> : (
+        {!hasDecision ? <div className="glass rounded-2xl p-8 mt-6 text-center"><Icon name="info" className="w-6 h-6 mx-auto text-cyan-300" /><p className="font-display text-lg mt-3">Analyze a decision to build your weekly view</p><p className="text-sm text-[var(--ink-1)] mt-2">Weekly savings will appear only after Mumb.AI has a real goal and constraints.</p>{!account && <><p className="text-sm text-cyan-300 mt-4">Sign in or sign up for a 5-hour free trial of all premium features.</p><button onClick={onAuthOpen} className="rounded-xl px-5 py-2.5 mt-4 text-sm font-medium text-[#04110E]" style={{backgroundImage:'var(--grad)'}}>Sign in / Sign up</button></>}</div> : !premiumUnlocked ? <LockedPanel feature="Weekly Optimizer" account={account} onAuthOpen={onAuthOpen} /> : !aiDecision?.weeklyItems?.length ? <div className="glass rounded-2xl p-8 mt-6 text-center"><Icon name="info" className="w-6 h-6 mx-auto text-amber-300" /><p className="font-display text-lg mt-3">AI weekly plan unavailable</p><p className="text-sm text-[var(--ink-1)] mt-2">Mumb.AI did not return weekly recommendations for this decision.</p></div> : (
           <div className="grid sm:grid-cols-3 gap-3 mt-6">
-            {WEEKLY_DEMO.map(w => (
+            {aiDecision.weeklyItems.map(w => (
               <div key={w.day} className="surface rounded-xl p-4">
-                <p className="text-[11px] font-mono text-[var(--ink-2)]">{w.day} · demo data</p>
+                <p className="text-[11px] font-mono text-[var(--ink-2)]">{w.day} · AI estimate</p>
                 <p className="text-sm mt-1.5">{w.action}</p>
                 <p className="font-display text-lg mt-1.5 text-cyan-300">Save {w.saveMin} min</p>
               </div>
             ))}
             <div className="sm:col-span-3 glass-strong rounded-xl p-4 flex items-center justify-between">
               <span className="text-sm text-[var(--ink-1)]">Potential weekly time saved</span>
-              <span className="font-display text-xl">1h 12m</span>
+              <span className="font-display text-xl">{aiDecision.weeklyItems.reduce((total, item) => total + Number(item.saveMin || 0), 0)}m</span>
             </div>
           </div>
         )}
@@ -1799,6 +1826,7 @@ function App(){
   const [goalText, setGoalText] = useState('');
   const [stage, setStage] = useState(0);
   const [hasDecision, setHasDecision] = useState(false);
+  const [aiDecision, setAiDecision] = useState(null);
   const [answer, setAnswer] = useState('');
   const [answerLoading, setAnswerLoading] = useState(false);
   const [toast, setToast] = useState(null);
@@ -1837,6 +1865,25 @@ function App(){
   const lastSubmitRef = useRef({});
 
   useEffect(() => {
+    let active = true;
+    generateCommunityPostsWithAI('commute').then(posts => {
+      if (!active) return;
+      setObservations(current => {
+        const userObservations = current.filter(observation => !observation.isAiGenerated);
+        const generated = posts.slice(0, 3).map((post, index) => ({
+          ...post,
+          id: `ai_${Date.now()}_${index}`,
+          authorId: `ai_user_${index}`,
+          ts: Date.now() - index * 7 * 60 * 1000,
+          isAiGenerated: true,
+        }));
+        return [...generated, ...userObservations];
+      });
+    }).catch(error => console.warn('Mumb.AI community generation unavailable:', error));
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
     if (account) {
       const accounts = readAccountStore();
       const updated = { ...account, timePoints, observations };
@@ -1851,8 +1898,16 @@ function App(){
     if (account && timePoints >= PREMIUM_THRESHOLD && account.rewardDecision !== 'redeemed' && account.rewardPromptAt !== timePoints) setRewardChoiceOpen(true);
   }, [account, timePoints]);
 
-  const constraints = useMemo(() => parseGoalFallback(goalText, scenarioKey), [goalText, scenarioKey]);
-  const options = useMemo(() => scenarioKey === 'ask' ? [] : generateOptions(constraints, scenarioKey), [scenarioKey, constraints.budget, constraints.deadlineMinutes, constraints.crowdPref]);
+  const fallbackConstraints = useMemo(() => parseGoalFallback(goalText, scenarioKey), [goalText, scenarioKey]);
+  const constraints = useMemo(() => {
+    if (aiDecision?.scenario !== scenarioKey) return fallbackConstraints;
+    return { ...fallbackConstraints, ...aiDecision.constraints };
+  }, [aiDecision, fallbackConstraints, scenarioKey]);
+  const options = useMemo(() => {
+    if (scenarioKey === 'ask') return [];
+    if (aiDecision?.scenario === scenarioKey && aiDecision.options?.length) return aiDecision.options;
+    return generateOptions(constraints, scenarioKey);
+  }, [aiDecision, scenarioKey, constraints]);
 
   const [whatIf, setWhatIf] = useState({ budget: constraints.budget, crowdTolerance: constraints.crowdPref, deadlineOffset: 0 });
   useEffect(() => { setWhatIf({ budget: constraints.budget, crowdTolerance: constraints.crowdPref, deadlineOffset: 0 }); }, [scenarioKey]);
@@ -1922,20 +1977,31 @@ function App(){
     askMumbAI(question).then(result => { setAnswer(result); setAnswerLoading(false); });
   }, []);
 
-  const runAnalysis = useCallback((isDemo=false) => {
-    if (!isDemo && !goalText.trim()) {
+  const runAnalysis = useCallback(async (isDemo=false, requestedGoal=goalText) => {
+    if (!isDemo && !requestedGoal.trim()) {
       showToast('Enter a goal before analysing your decision.');
       return;
     }
     if (scenarioKey === 'ask') {
-      askQuestion(goalText);
+      askQuestion(requestedGoal);
       return;
     }
+    setAiDecision(null);
     setHasDecision(true);
     setView('analyze');
     setShowExplain(false);
     setStage(1);
-  }, [askQuestion, goalText, scenarioKey]);
+    try {
+      const result = await analyzeDecisionWithAI({ goal: requestedGoal, scenario: scenarioKey, communitySignals: observations.slice(0, 10) });
+      setAiDecision({ ...result, scenario: scenarioKey });
+      showToast('Mumb.AI built this decision from your goal and available signals.');
+    } catch (error) {
+      console.error('Mumb.AI decision analysis failed:', error);
+      setHasDecision(false);
+      setStage(0);
+      showToast('AI analysis unavailable — no decision estimates were created.');
+    }
+  }, [askQuestion, goalText, observations, scenarioKey, showToast]);
 
   const addObservation = useCallback(({ category, context, note, onComplete }) => {
     if (!account) {
@@ -2013,7 +2079,7 @@ function App(){
     setScenarioKey('commute');
     setGoalText(SCENARIOS.commute.placeholder);
     showToast('Live demo started — watch the flow below.');
-    runAnalysis(true);
+    runAnalysis(true, SCENARIOS.commute.placeholder);
   }, [runAnalysis, showToast]);
 
   useEffect(() => {
@@ -2047,8 +2113,8 @@ function App(){
           <>
             <AnalyzeFlow goalText={goalText} setGoalText={setGoalText} scenarioKey={scenarioKey} setScenarioKey={setScenarioKey}
               stage={stage} setStage={setStage} constraints={constraints} options={options}
-              onRunAnalysis={() => runAnalysis(false)} isDemo={demoActive} />
-            {stage >= 4 && (
+              onRunAnalysis={() => runAnalysis(false)} isDemo={demoActive} aiReady={Boolean(aiDecision?.scenario === scenarioKey)} />
+            {stage >= 4 && aiDecision?.scenario === scenarioKey && (
               <section className="max-w-5xl mx-auto px-5 md:px-8 pb-16 space-y-6">
                 <DecisionGraph scored={scoredMain} />
                 <RecommendationCard rec={rec} unit={SCENARIOS[scenarioKey].unit} onExplain={() => setShowExplain(s=>!s)} showExplain={showExplain} constraints={constraints} />
@@ -2058,7 +2124,7 @@ function App(){
         )}
 
         {view === 'simulator' && (
-            <WhatIfSimulator scenarioKey={scenarioKey} baseConstraints={constraints} options={options}
+            <WhatIfSimulator scenarioKey={scenarioKey} baseConstraints={constraints} options={options} aiDecision={aiDecision}
             whatIf={whatIf} setWhatIf={setWhatIfTracked} recalculating={recalculating} premiumUnlocked={premiumUnlocked} hasDecision={hasDecision} account={account} onAuthOpen={() => setAuthMode('signup')} />
         )}
 
@@ -2067,7 +2133,7 @@ function App(){
         )}
 
         {view === 'timemachine' && (
-          <TimeMachine scenarioKey={scenarioKey} constraints={constraints} premiumUnlocked={premiumUnlocked} account={account} onAuthOpen={() => setAuthMode('signup')} hasDecision={hasDecision} />
+          <TimeMachine scenarioKey={scenarioKey} constraints={constraints} aiDecision={aiDecision} premiumUnlocked={premiumUnlocked} account={account} onAuthOpen={() => setAuthMode('signup')} hasDecision={hasDecision} />
         )}
 
         {view === 'wallet' && (
