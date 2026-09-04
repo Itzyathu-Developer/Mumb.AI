@@ -78,7 +78,7 @@ async function requestGroq(system, user) {
   }, 'Groq');
 
   const rawText = response.choices?.[0]?.message?.content || response.choices?.[0]?.message?.content?.parts?.[0]?.text || '';
-  return normalizeModelResult(response, rawText);
+  return normalizeModelResult(parseJson(rawText), rawText);
 }
 
 async function requestGemini(system, user) {
@@ -97,7 +97,7 @@ async function requestGemini(system, user) {
   );
 
   const rawText = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  return normalizeModelResult(response, rawText);
+  return normalizeModelResult(parseJson(rawText), rawText);
 }
 
 async function requestOpenAI(system, user) {
@@ -121,7 +121,7 @@ async function requestOpenAI(system, user) {
   );
 
   const rawText = response.choices?.[0]?.message?.content || response.choices?.[0]?.message?.content?.parts?.[0]?.text || '';
-  return normalizeModelResult(response, rawText);
+  return normalizeModelResult(parseJson(rawText), rawText);
 }
 
 async function askModel(system, user) {
