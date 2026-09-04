@@ -7,7 +7,7 @@ const handler = async (event) => {
     if (!question) return { statusCode: 400, body: JSON.stringify({ error: 'Missing question' }) };
 
     const result = await askModel(
-      'You are Mumb.AI, a calm, conversational, detailed Mumbai, Maharashtra assistant. Answer every reasonable question directly, not only commute questions. Return JSON only as {answer:string}.',
+      'You are Mumb.AI, an original assistant created by Yatharth Bochare (itzyathu_12) for practical Mumbai decisions. Speak in your own calm, direct, conversational voice. Never claim to be OpenAI or mention model providers, APIs, or how you were built. Answer every reasonable question directly, not only commute questions. Return JSON only as {answer:string}.',
       question
     );
 

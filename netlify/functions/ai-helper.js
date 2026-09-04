@@ -6,10 +6,8 @@ function envValue(primary, fallbacks = []) {
   return undefined;
 }
 
-const OPENAI_API_KEY = envValue('OPENAI_API_KEY', ['OPENAI_KEY', 'OPENAI_SECRET']);
 const GEMINI_API_KEY = envValue('GEMINI_API_KEY', ['GEMINI_KEY', 'GOOGLE_API_KEY', 'GOOGLE_API_SECRET']);
 const GROQ_API_KEY = envValue('GROQ_API_KEY', ['GROQ_KEY', 'GROQ_SECRET']);
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const GROQ_MODEL = process.env.GROQ_MODEL || '';
 
 async function getGroqModel() {
@@ -100,35 +98,10 @@ async function requestGemini(system, user) {
   return normalizeModelResult(parseJson(rawText), rawText);
 }
 
-async function requestOpenAI(system, user) {
-  const payload = {
-    model: OPENAI_MODEL,
-    temperature: 0.2,
-    response_format: { type: 'json_object' },
-    messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
-  };
-  const response = await fetchJson(
-    'https://api.openai.com/v1/chat/completions',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify(payload),
-    },
-    'OpenAI'
-  );
-
-  const rawText = response.choices?.[0]?.message?.content || response.choices?.[0]?.message?.content?.parts?.[0]?.text || '';
-  return normalizeModelResult(parseJson(rawText), rawText);
-}
-
 async function askModel(system, user) {
   if (GROQ_API_KEY) return requestGroq(system, user);
   if (GEMINI_API_KEY) return requestGemini(system, user);
-  if (OPENAI_API_KEY) return requestOpenAI(system, user);
-  throw new Error('Set GROQ_API_KEY, GEMINI_API_KEY, or OPENAI_API_KEY');
+  throw new Error('Set GROQ_API_KEY or GEMINI_API_KEY');
 }
 
 module.exports = { askModel };

@@ -9,15 +9,13 @@ function envValue(primary, fallbacks = []) {
 const handler = async () => {
   const groq = Boolean(envValue('GROQ_API_KEY', ['GROQ_KEY', 'GROQ_SECRET']));
   const gemini = Boolean(envValue('GEMINI_API_KEY', ['GEMINI_KEY', 'GOOGLE_API_KEY', 'GOOGLE_API_SECRET']));
-  const openai = Boolean(envValue('OPENAI_API_KEY', ['OPENAI_KEY', 'OPENAI_SECRET']));
   return {
     statusCode: 200,
     body: JSON.stringify({
-      provider: groq ? 'groq' : gemini ? 'gemini' : openai ? 'openai' : null,
-      active: groq || gemini || openai,
+      provider: groq || gemini ? 'mumb-ai-engine' : null,
+      active: groq || gemini,
       hasGroq: groq,
       hasGemini: gemini,
-      hasOpenAI: openai,
     }),
   };
 };

@@ -1,5 +1,7 @@
 # Decidr AI 🚦
 
+Created by Yatharth Bochare (`itzyathu_12`).
+
 ## Problem
 Mumbai’s traffic is unpredictable, and people struggle to make optimal route decisions due to a lack of structured insights.
 
@@ -15,7 +17,7 @@ Decidr AI combines AI-driven predictions with real-time community observations t
 ## Tech Stack
 - Frontend: HTML, CSS, JS
 - Backend: Node.js, Express
-- AI: OpenAI API
+- AI: Mumb.AI decision engine with configurable Gemini or Groq inference
 
 ## How it works
 User inputs a route → AI analyses → combines with community data → suggests the best decision.
