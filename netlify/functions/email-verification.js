@@ -10,7 +10,14 @@ function json(statusCode, body) {
 
 function normalizeEmail(email) { return String(email || '').trim().toLowerCase(); }
 function createCode() { return String(crypto.randomInt(100000, 1000000)); }
-function getVerificationStore() { return getStore({ name: 'email-verification', consistency: 'strong' }); }
+function getVerificationStore() {
+  const options = { name: 'email-verification', consistency: 'strong' };
+  if (process.env.NETLIFY_SITE_ID && process.env.NETLIFY_AUTH_TOKEN) {
+    options.siteID = process.env.NETLIFY_SITE_ID;
+    options.token = process.env.NETLIFY_AUTH_TOKEN;
+  }
+  return getStore(options);
+}
 
 async function sendVerificationEmail(email, code) {
   const apiKey = process.env.RESEND_API_KEY;
@@ -39,9 +46,9 @@ exports.handler = async event => {
   if (input.action === 'send') {
     const code = createCode();
     try {
-      await sendVerificationEmail(email, code);
       const store = getVerificationStore();
       await store.setJSON(key, { code, expiresAt: Date.now() + CODE_TTL_MS, attempts: 0 });
+      await sendVerificationEmail(email, code);
       return json(200, { ok: true });
     } catch (error) {
       console.error('Verification email failed:', error.message);
@@ -50,16 +57,21 @@ exports.handler = async event => {
   }
 
   if (input.action === 'verify') {
-    const store = getVerificationStore();
-    const record = await store.get(key, { type: 'json' });
-    if (!record || record.expiresAt < Date.now()) return json(400, { error: 'That code has expired. Request a new one.' });
-    if (record.attempts >= MAX_ATTEMPTS) return json(429, { error: 'Too many incorrect attempts. Request a new code.' });
-    if (String(input.code || '').trim() !== record.code) {
-      await store.setJSON(key, { ...record, attempts: record.attempts + 1 });
-      return json(400, { error: 'That verification code is incorrect.' });
+    try {
+      const store = getVerificationStore();
+      const record = await store.get(key, { type: 'json' });
+      if (!record || record.expiresAt < Date.now()) return json(400, { error: 'That code has expired. Request a new one.' });
+      if (record.attempts >= MAX_ATTEMPTS) return json(429, { error: 'Too many incorrect attempts. Request a new code.' });
+      if (String(input.code || '').trim() !== record.code) {
+        await store.setJSON(key, { ...record, attempts: record.attempts + 1 });
+        return json(400, { error: 'That verification code is incorrect.' });
+      }
+      await store.delete(key);
+      return json(200, { ok: true, verifiedEmail: email });
+    } catch (error) {
+      console.error('Verification lookup failed:', error.message);
+      return json(503, { error: 'Verification is temporarily unavailable. Check the Netlify Blobs configuration and try again.' });
     }
-    await store.delete(key);
-    return json(200, { ok: true, verifiedEmail: email });
   }
   return json(400, { error: 'Unknown verification action' });
 };

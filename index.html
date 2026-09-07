@@ -1724,6 +1724,7 @@ function AuthModal({ mode, setMode, onClose, onSubmit }){
   const [verificationPending, setVerificationPending] = useState(false);
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const verificationInputRef = useRef(null);
 
   const submit = async e => {
     e.preventDefault();
@@ -1731,7 +1732,11 @@ function AuthModal({ mode, setMode, onClose, onSubmit }){
       setMessage(mode === 'signup' ? 'Enter your name and email.' : 'Enter your email.');
       return;
     }
-    if (password.length < 8) {
+    if (verificationPending && verificationCode.length !== 6) {
+      setMessage('Enter the 6-digit verification code from your email.');
+      return;
+    }
+    if (!verificationPending && password.length < 8) {
       setMessage('Password must be at least 8 characters.');
       return;
     }
@@ -1741,8 +1746,24 @@ function AuthModal({ mode, setMode, onClose, onSubmit }){
     const result = await onSubmit({ name: name.trim() || email.split('@')[0], email: normalizedEmail, passwordHash, verificationCode: verificationPending ? verificationCode : undefined });
     setSubmitting(false);
     if (result?.error) setMessage(result.error);
-    else if (result?.verificationRequired) { setVerificationPending(true); setMessage('We sent a 6-digit code to your email.'); }
+    else if (result?.verificationRequired) {
+      setVerificationPending(true);
+      setMessage('We sent a 6-digit code to your email.');
+    }
   };
+
+  const resendCode = async () => {
+    setSubmitting(true);
+    setMessage('Sending a new verification code…');
+    const result = await onSubmit({ name: name.trim() || email.split('@')[0], email: email.trim().toLowerCase(), passwordHash, verificationCode: undefined });
+    setSubmitting(false);
+    setMessage(result?.error || 'A new 6-digit verification code was sent.');
+    if (!result?.error) verificationInputRef.current?.focus();
+  };
+
+  useEffect(() => {
+    if (verificationPending) verificationInputRef.current?.focus();
+  }, [verificationPending]);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center px-5" role="dialog" aria-modal="true" aria-labelledby="auth-title">
@@ -1757,7 +1778,12 @@ function AuthModal({ mode, setMode, onClose, onSubmit }){
         {mode === 'signup' && <input value={name} onChange={e => setName(e.target.value)} placeholder="Your name" className="w-full surface rounded-lg px-3 py-2.5 mt-6 text-sm bg-transparent placeholder:text-[var(--ink-2)]" />}
         <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email address" className="w-full surface rounded-lg px-3 py-2.5 mt-3 text-sm bg-transparent placeholder:text-[var(--ink-2)]" />
         {!verificationPending && <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password (8+ characters)" className="w-full surface rounded-lg px-3 py-2.5 mt-3 text-sm bg-transparent placeholder:text-[var(--ink-2)]" autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} />}
-        {verificationPending && <input inputMode="numeric" pattern="[0-9]{6}" maxLength="6" value={verificationCode} onChange={e => setVerificationCode(e.target.value.replace(/\D/g, ''))} placeholder="6-digit verification code" className="w-full surface rounded-lg px-3 py-2.5 mt-3 text-sm bg-transparent placeholder:text-[var(--ink-2)]" autoComplete="one-time-code" />}
+        {verificationPending && <div className="mt-5 rounded-xl surface p-4">
+          <p className="text-sm font-medium">Enter your verification code</p>
+          <p className="text-xs text-[var(--ink-1)] mt-1">Check {email} for the 6-digit code.</p>
+          <input ref={verificationInputRef} type="text" inputMode="numeric" pattern="[0-9]{6}" maxLength="6" value={verificationCode} onChange={e => setVerificationCode(e.target.value.replace(/\D/g, ''))} placeholder="123456" className="w-full surface rounded-lg px-3 py-2.5 mt-3 text-sm bg-transparent placeholder:text-[var(--ink-2)] tracking-[0.35em]" autoComplete="one-time-code" aria-label="6-digit verification code" />
+          <button type="button" onClick={resendCode} disabled={submitting} className="text-xs text-cyan-300 hover:text-cyan-200 mt-3 disabled:opacity-50">Send a new code</button>
+        </div>}
         {message && <p className="text-xs text-amber-300 mt-3">{message}</p>}
         <button type="submit" disabled={submitting} className="w-full rounded-xl py-2.5 mt-5 text-sm font-medium text-[#04110E] disabled:opacity-50" style={{backgroundImage:'var(--grad)'}}>{submitting ? 'Checking…' : verificationPending ? 'Verify email' : mode === 'signup' ? 'Create account' : 'Sign in'}</button>
         <button type="button" onClick={() => { setMode(mode === 'signup' ? 'signin' : 'signup'); setMessage(''); }} className="w-full text-xs text-[var(--ink-1)] mt-4">{mode === 'signup' ? 'Already have an account? Sign in' : 'New here? Sign up'}</button>
