@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { getStore } = require('@netlify/blobs');
+const { Redis } = require('@upstash/redis');
 
 const CODE_TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
@@ -11,6 +12,18 @@ function json(statusCode, body) {
 function normalizeEmail(email) { return String(email || '').trim().toLowerCase(); }
 function createCode() { return String(crypto.randomInt(100000, 1000000)); }
 function getVerificationStore() {
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    const redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    });
+    return {
+      setJSON: (key, value) => redis.set(key, value, { ex: CODE_TTL_MS / 1000 }),
+      get: key => redis.get(key),
+      delete: key => redis.del(key),
+    };
+  }
+
   const options = { name: 'email-verification', consistency: 'strong' };
   if (process.env.NETLIFY_SITE_ID && process.env.NETLIFY_AUTH_TOKEN) {
     options.siteID = process.env.NETLIFY_SITE_ID;

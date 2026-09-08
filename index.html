@@ -1214,7 +1214,7 @@ async function analyzeObservationWithAI(payload){
 
 async function askMumbAI(question){
   try {
-    const response = await fetch(`${API_BASE}/.netlify/functions/ask-nexus`, {
+    const response = await fetch(`${API_BASE}/api/ask-nexus`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question }),
@@ -1233,7 +1233,7 @@ async function askMumbAI(question){
 }
 
 async function analyzeDecisionWithAI({ goal, scenario, communitySignals }){
-  const response = await fetch(`${API_BASE}/.netlify/functions/analyze-decision`, {
+  const response = await fetch(`${API_BASE}/api/analyze-decision`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ goal, scenario, communitySignals }),
@@ -1247,7 +1247,7 @@ async function analyzeDecisionWithAI({ goal, scenario, communitySignals }){
 }
 
 async function generateCommunityPostsWithAI(scenario){
-  const response = await fetch(`${API_BASE}/.netlify/functions/generate-community-posts`, {
+  const response = await fetch(`${API_BASE}/api/generate-community-posts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ scenario, count: 3 }),

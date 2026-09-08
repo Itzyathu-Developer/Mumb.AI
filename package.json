@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "@netlify/blobs": "^11.0.3"
+    "@netlify/blobs": "^11.0.3",
+    "@upstash/redis": "^1.38.4"
   }
 }
