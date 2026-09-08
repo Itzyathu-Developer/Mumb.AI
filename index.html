@@ -1228,7 +1228,7 @@ async function askMumbAI(question){
     return payload.answer;
   } catch (error) {
     console.error('Mumb.AI request failed:', error);
-    return `Mumb.AI could not reach the deployed AI service. ${error.message} Please redeploy the latest version and check the Netlify function logs.`;
+    return buildLocalAnswer(question);
   }
 }
 

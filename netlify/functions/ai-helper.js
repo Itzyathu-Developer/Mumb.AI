@@ -61,6 +61,7 @@ async function requestGroq(system, user) {
   const payload = {
     model: await getGroqModel(),
     temperature: 0.2,
+    max_tokens: 1200,
     response_format: { type: 'json_object' },
     messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
   };
@@ -86,7 +87,7 @@ async function requestGemini(system, user) {
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents: [{ role: 'user', parts: [{ text: user }] }],
-        generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
+        generationConfig: { temperature: 0.2, maxOutputTokens: 1200, responseMimeType: 'application/json' },
       }),
     },
     'Gemini'
