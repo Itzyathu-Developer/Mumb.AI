@@ -23,7 +23,6 @@ Mumb.AI combines AI-driven predictions with real-time community observations to 
 User inputs a route → AI analyses → combines with community data → suggests the best decision.
 
 ## Deployment
-
 The static site and API can be deployed to either Netlify or Vercel.
 
 - Netlify: deploy the repository with `netlify.toml`; set `GROQ_API_KEY` or `GEMINI_API_KEY` and the email variables in the Netlify dashboard.
