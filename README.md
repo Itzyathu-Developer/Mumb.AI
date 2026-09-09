@@ -1,4 +1,4 @@
-# Mumb.AI 
+# Mumb.AI
 
 Created by Yatharth Ganesh Bochare (`itzyathu_12`).
 
